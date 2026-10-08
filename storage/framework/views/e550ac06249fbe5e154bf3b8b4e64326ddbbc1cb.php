@@ -1,0 +1,119 @@
+<?php $__env->startSection('title', 'Pembelian — TaniRaya ERP'); ?>
+<?php $__env->startSection('page-title', 'Pembelian'); ?>
+<?php $__env->startSection('page-subtitle', 'Transaksi pembelian sparepart'); ?>
+
+<?php $__env->startSection('content'); ?>
+
+<div class="tabs">
+  <button class="tab-btn is-active" data-tab-target="viewList">Riwayat</button>
+  <?php if (\Illuminate\Support\Facades\Blade::check('permission', 'purchase.create')): ?>
+  <button class="tab-btn" data-tab-target="viewForm">+ Catat Pembelian</button>
+  <?php endif; ?>
+</div>
+
+<section id="viewList" class="view is-active">
+  <?php echo $__env->make('partials.list-toolbar', ['searchPlaceholder' => 'Cari nama sparepart...'], \Illuminate\Support\Arr::except(get_defined_vars(), ['__data', '__path']))->render(); ?>
+
+  <?php if(request('date') === 'today'): ?>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:12.5px; color:var(--color-text-muted);">
+      <span>Menampilkan pembelian hari ini saja</span>
+      <a href="<?php echo e(route('purchases.index')); ?>" class="section__link">Lihat semua →</a>
+    </div>
+  <?php endif; ?>
+
+  <div class="list-view is-active">
+  <?php $__empty_1 = true; $__currentLoopData = $purchases; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $p): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+    <div class="list-card">
+      <div class="list-card__main">
+        <span class="list-card__title"><?php echo e($p->sparepart->name ?? '-'); ?> × <?php echo e($p->quantity); ?></span>
+        <span class="list-card__meta"><?php echo e($p->supplier->name ?? '-'); ?> &middot; <?php echo e($p->invoice_number ?? '-'); ?> &middot; <?php echo e(\Carbon\Carbon::parse($p->purchase_date)->format('d M Y')); ?></span>
+      </div>
+      <div class="list-card__side">
+        <span class="list-card__value">Rp<?php echo e(number_format($p->total_price, 0, ',', '.')); ?></span>
+        <button type="button" class="btn btn-sm btn-secondary" style="width:auto; height:28px; padding:0 10px;"
+          onclick="showDetailModal(this)"
+          data-detail-title="Detail Pembelian"
+          data-detail="<?php echo e(json_encode([
+            'Sparepart' => $p->sparepart->name ?? '-',
+            'Jumlah' => $p->quantity,
+            'Harga Satuan' => 'Rp'.number_format($p->unit_price, 0, ',', '.'),
+            'Total' => 'Rp'.number_format($p->total_price, 0, ',', '.'),
+            'Supplier' => $p->supplier->name ?? '-',
+            'No. Invoice' => $p->invoice_number ?? '-',
+            'Tanggal' => \Carbon\Carbon::parse($p->purchase_date)->format('d M Y'),
+            'Terkait Pre-Order' => $p->preorder->code ?? '-',
+            'Dicatat Oleh' => $p->recorder->name ?? '-',
+          ], JSON_HEX_APOS | JSON_HEX_QUOT)); ?>">Detail</button>
+      </div>
+    </div>
+  <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+    <p class="empty-state">Belum ada riwayat pembelian.</p>
+  <?php endif; ?>
+  </div>
+
+  <?php echo $__env->make('partials.pagination', ['paginator' => $purchases], \Illuminate\Support\Arr::except(get_defined_vars(), ['__data', '__path']))->render(); ?>
+</section>
+
+<?php if (\Illuminate\Support\Facades\Blade::check('permission', 'purchase.create')): ?>    
+<section id="viewForm" class="view">
+<form method="POST" action="<?php echo e(route('purchases.store')); ?>" data-safe-form="purchase">
+    <?php echo csrf_field(); ?>
+
+    <div class="form-group">
+      <label class="form-label" for="pb-preorder">Terkait Pre-Order (opsional)</label>
+      <select class="form-control" id="pb-preorder" name="preorder_id">
+        <option value="">— Tidak terkait pre-order —</option>
+        <?php $__currentLoopData = $approvedPreorders; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $po): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+          <option value="<?php echo e($po->id); ?>" <?php if (old('preorder_id') == $po->id) echo 'selected'; ?>><?php echo e($po->sparepart->name ?? '-'); ?> — sisa <?php echo e($po->remaining_quantity); ?> (<?php echo e($po->code); ?>)</option>
+        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="pb-sparepart">Sparepart</label>
+      <select class="form-control" id="pb-sparepart" name="sparepart_id" required>
+        <?php $__currentLoopData = $spareparts; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $sp): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+          <option value="<?php echo e($sp->id); ?>" <?php echo e(old('sparepart_id') == $sp->id ? 'selected' : ''); ?>><?php echo e($sp->name); ?></option>
+        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="pb-qty">Jumlah</label>
+        <input class="form-control" id="pb-qty" name="quantity" type="number" min="1" value="<?php echo e(old('quantity')); ?>" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="pb-harga">Harga Satuan (Rp)</label>
+        <input class="form-control" id="pb-harga" name="unit_price" type="number" min="0" value="<?php echo e(old('unit_price')); ?>" required>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="pb-supplier">Supplier</label>
+      <select class="form-control" id="pb-supplier" name="supplier_id" required>
+        <?php $__currentLoopData = $suppliers; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $s): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+          <option value="<?php echo e($s->id); ?>" <?php echo e(old('supplier_id') == $s->id ? 'selected' : ''); ?>><?php echo e($s->name); ?></option>
+        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="pb-invoice">No. PO / Invoice</label>
+        <input class="form-control" id="pb-invoice" name="invoice_number" value="<?php echo e(old('invoice_number')); ?>" placeholder="INV-2026-XXXX">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="pb-tanggal">Tanggal</label>
+        <input class="form-control" id="pb-tanggal" name="purchase_date" type="date" value="<?php echo e(old('purchase_date', date('Y-m-d'))); ?>" required>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block">Simpan Pembelian</button>
+  </form>
+</section>
+<?php endif; ?>
+
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layouts.app', \Illuminate\Support\Arr::except(get_defined_vars(), ['__data', '__path']))->render(); ?><?php /**PATH /home/vol15_6/infinityfree.com/if0_42998193/htdocs/resources/views/purchases/index.blade.php ENDPATH**/ ?>
